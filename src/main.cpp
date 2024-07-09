@@ -6,6 +6,8 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include "ESPAsyncWebServer.h"
+#include "SPIFFS.h"
 
 Adafruit_BME280 bme;
 File file;
@@ -16,6 +18,8 @@ File file;
 
 const char *SSID = "TP-Link_2A30";
 const char *PASSWORD = "48251969";
+
+AsyncWebServer Server(80);         //  ポート番号（HTTP）
 
 const char *NTP1 = "ntp.nict.jp";
 const char *NTP2 = "ntp.jst.mfeed.ad.jp";
@@ -91,17 +95,55 @@ void setup() {
 	}
 	if(count < 999) {
 		Serial.print("done\nNTP Server is Reached. Now RealTime is ");
-		Serial.printf("%04d/%02d/%02d(%s) %02d:%02d:%02d (UTC+09)",
+		Serial.printf("%04d/%02d/%02d(%s) %02d:%02d:%02d (UTC+09)\n",
 				tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
 				date[tm->tm_wday],
 				tm->tm_hour, tm->tm_min, tm->tm_sec);
 	} else {
-		Serial.print("NTP Server is Timeout. Set a Tentative Date of 1970/1/1 00:00:00 (UTC+00)");
+		Serial.print("NTP Server is Timeout. Set a Tentative Date of 1970/1/1 00:00:00 (UTC+00)\n");
 	}
 
 	jump:
 
+
+	Serial.print("Initializing WebServer...\n");
+
+	// SPIFFSの初期化とファイル存在確認
+	if(!SPIFFS.begin(true)){
+		Serial.println("An Error has occurred while mounting SPIFFS\nServer initialization is Incomplete");
+		goto finish;
+	}
+	if (!SPIFFS.exists("/index.html")) {
+		Serial.println("/index.html does not exist\nServer initialization is Incomplete");
+		goto finish;
+	}
+	if (!SPIFFS.exists("/style.css")) {
+		Serial.println("/style.css does not exist\nServer initialization is Incomplete");
+		goto finish;
+	}
+
+
+	Server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+		request->send(SPIFFS, "/index.html");
+	});
+	// style.cssにアクセスされた時のレスポンス
+	Server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+		request->send(SPIFFS, "/style.css", "text/css");
+	});
+	//tcpip_init(NULL, NULL);
+
+	Serial.printf("Available heap: %d\n", ESP.getFreeHeap());
+
+	tcpip_adapter_init();
+	
+	Server.begin();
+
+	Serial.println("Server start!");
+
+finish:
+
 	Serial.print("\nInitialization is completed.\n\n");
+	Serial.print("Day\tTime\tTemperature [degC]\tPressure [hPa]\tHumidity [\%RH]\n");
 
 	count = 0;
 }
@@ -131,7 +173,7 @@ void loop() {
 	pressure=bme.readPressure() / 100.0F;
 	humid=bme.readHumidity();
 
-	sprintf(str, "%02d:%02d:%02d\t%lf\t%lf\t%lf\n", tm->tm_hour, tm->tm_min, tm->tm_sec, temp, pressure, humid);
+	sprintf(str, "%02d-%02d-%02d\t%02d:%02d:%02d\t%.2lf\t%.2lf\t%.2lf\n", tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, temp, pressure, humid);
 	//Serial.print("Writing: ");
 	Serial.print(str);
 
