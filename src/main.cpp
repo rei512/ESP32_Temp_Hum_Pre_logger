@@ -38,6 +38,18 @@ double temp;
 double pressure;
 double humid;
 
+String processor(const String& var) {
+	Serial.println(var);
+	if (var == "TEMP") {
+		return String(temp);
+	} else if(var == "PRESSURE") {
+		return String(pressure);
+	} else if(var == "HUMID") {
+		return String(humid);
+	} else {
+		return String();
+	}
+}
 void setup() {
 	// put your setup code here, to run once:
 	Serial.begin(115200);
@@ -122,6 +134,9 @@ void setup() {
 		goto finish;
 	}
 
+	Server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+		request->send(SPIFFS, "/index.html", String(), false, processor);
+	});
 
 	Server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
 		request->send(SPIFFS, "/index.html");
@@ -187,5 +202,5 @@ void loop() {
 	//Serial.println(fileName);
 	file.close();
 	*/
-	delay(1000);
+	delay(200);
 }
