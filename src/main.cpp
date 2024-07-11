@@ -47,7 +47,7 @@ const char *NTP2 = "ntp.jst.mfeed.ad.jp";
 
 static const char *date[7] = {"Sun","Mon","Tue","Wed","Thr","Fri","Sat"};
 unsigned char count;
-char str[100];
+char str[150];
 char fileName[32];
 
 unsigned char status;
@@ -252,7 +252,40 @@ void loop() {
 	//Serial.print("Writing: ");
 	Serial.print(str);
 
-	
+	Serial.println("\nStarting connection to server...");
+
+	if (!client.connect(HOST, 443)) {
+		Serial.println("Connection failed!");
+	} else {
+		Serial.println("Connected to server!");
+		// Make a HTTP request:
+		sprintf(str, "GET https://http2d1telemetry.deltav-lab.workers.dev/api/insert?time=%d&temp=%.2lf&pres=%.2lf&humi=%.2lf  HTTP/1.0", t, temp, pressure, humid);
+		client.println(str);
+		Serial.println(str);
+		sprintf(str, "Host: http2d1telemetry.deltav-lab.workers.dev");
+		client.println(str);
+		Serial.println(str);
+		sprintf(str, "Connection: close");
+		client.println(str);
+		Serial.println(str);
+		client.println();
+
+		while (client.connected()) {
+			String line = client.readStringUntil('\n');
+			if (line == "\r") {
+				Serial.println("headers received");
+				break;
+			}
+		}
+		// if there are incoming bytes available
+		// from the server, read them and print them:
+		while (client.available()) {
+			char c = client.read();
+			Serial.write(c);
+		}
+	    client.stop();
+		Serial.println("\nClient stop");
+	}
 	/*
 	file = SD.open(fileName, FILE_APPEND);
 	status = file.print(str);
@@ -263,5 +296,5 @@ void loop() {
 	//Serial.println(fileName);
 	file.close();
 	*/
-	delay(200);
+	delay(10000);
 }
